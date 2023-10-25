@@ -1,0 +1,129 @@
+---
+# tasks file for MicrosoftTeamsUser
+
+- name: Set PAT variable
+  set_fact:
+    PAT: "{{ lookup('env','PAT') }}"
+
+- name: Set check user member in a team variable
+  set_fact:
+    check_member: false
+
+- name: Set check user owner in a team variable
+  set_fact:
+    check_owner: false
+
+- name: Get the Token variable
+  shell: "kubectl get secret microsoft-graph-token -o jsonpath='{.data.microsoft-graph-token}' | base64 --decode"
+  register: token_output
+
+- name: Set owner variable
+  set_fact:
+    owner: "https://graph.microsoft.com/v1.0/users/{{ user_team.azuread_user }}"
+  when: user_team.github_role == "maintainer"
+
+- name: Set member list variable
+  set_fact:
+    member: "https://graph.microsoft.com/v1.0/users/{{ user_team.azuread_user }}"
+  when: user_team.github_role == "member"
+
+- name: Introduce a delay
+  pause:
+    seconds: 20
+  when: member is defined or member != ""
+
+- name: List teams
+  uri:
+    url: "https://graph.microsoft.com/v1.0/me/joinedTeams"
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: listmyteams_response
+  ignore_errors: true
+
+- name: Introduce a delay
+  pause:
+    seconds: 15
+
+- name: Set team_id variable
+  set_fact:
+    team_id: "{{ item.id }}"
+  loop: "{{ listmyteams_response.json.value }}"
+  when: item.displayName == name
+
+- name: Introduce a delay
+  pause:
+    seconds: 20
+  when: member is defined or member != ""
+
+- name: List members of a team
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/members"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: lstmembers_response
+  ignore_errors: true
+  when: (user_team.github_role == "member") and (team_id is defined or team_id != "")
+
+- name: Introduce a delay
+  pause:
+    seconds: 20
+
+- name: List owners of a team
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/owners"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: lstowners_response
+  ignore_errors: true
+  when: (user_team.github_role == "maintainer") and (team_id is defined or team_id != "")
+
+- name: Set check if user is a member of the team variable
+  set_fact:
+    check_member: true
+  loop: "{{ lstmembers_response.json.value }}"
+  ignore_errors: true
+  when: (lstmembers_response is defined) and (lstmembers_response.json.value | length > 0) and (item.userPrincipalName == user_team.azuread_user)
+
+- name: Set check if user is a owner of the team variable
+  set_fact:
+    check_owner: true
+  loop: "{{ lstowners_response.json.value }}"
+  ignore_errors: true
+  when: (lstowners_response is defined) and (lstowners_response.json.value | length > 0) and (item.userPrincipalName == user_team.azuread_user)
+
+- name: Introduce a delay
+  pause:
+    seconds: 10
+
+- name: Add owner to a group
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/owners/$ref"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    body_format: json
+    body: '{"@odata.id":"{{ owner }}"}'
+    status_code: 204
+  ignore_errors: true
+  when: (team_id is defined or team_id != "") and (owner is defined or owner != "") and (check_owner == false)
+
+- name: Introduce a delay
+  pause:
+    seconds: 15
+
+- name: Add member to a group
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/members/$ref"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    body_format: json
+    body: '{"@odata.id":"{{ member }}"}'
+    status_code: 204
+  ignore_errors: true
+  when: (team_id is defined or team_id != "") and (member is defined or member != "") and (check_member == false)

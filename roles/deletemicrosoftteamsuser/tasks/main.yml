@@ -1,0 +1,86 @@
+---
+# tasks file for MicrosoftTeamsUser
+
+- name: Get the Token variable
+  shell: "kubectl get secret microsoft-graph-token -o jsonpath='{.data.microsoft-graph-token}' | base64 --decode"
+  register: token_output
+
+- name: List teams
+  uri:
+    url: "https://graph.microsoft.com/v1.0/me/joinedTeams"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: teams_response
+  ignore_errors: true
+
+- name: Introduce a delay
+  pause:
+    seconds: 10
+
+- name: Set team_id variable
+  set_fact:
+    team_id: "{{ item.id }}"
+  loop: "{{ teams_response.json.value  }}"
+  when: item.displayName == name
+
+- name: Introduce a delay
+  pause:
+    seconds: 10
+
+- name: List members of a team
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/members"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: lstmembers_response
+  ignore_errors: true
+  when: user_team.github_role == "member"
+
+- name: List owners of a team
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/owners"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 200
+  register: lstowners_response
+  ignore_errors: true
+  when: user_team.github_role == "maintainer"
+
+- name: Set member_id variable
+  set_fact:
+    member_id: "{{ item.id }}"
+  loop: "{{ lstmembers_response.json.value  }}"
+  ignore_errors: true
+  when: (item.userPrincipalName == user_team.azuread_user) and (user_team.github_role == "member")
+
+- name: Set owner_id variable
+  set_fact:
+    owner_id: "{{ item.id }}"
+  loop: "{{ lstowners_response.json.value  }}"
+  ignore_errors: true
+  when: (item.userPrincipalName == user_team.azuread_user) and (user_team.github_role == "maintainer")
+
+- name: Remove member from a group
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/members/{{ member_id }}/$ref"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 204
+  ignore_errors: true
+  when: user_team.github_role == "member"
+
+- name: Remove owner from a group
+  uri:
+    url: "https://graph.microsoft.com/v1.0/groups/{{ team_id }}/owners/{{ owner_id }}/$ref"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ token_output.stdout }}"
+    status_code: 204
+  ignore_errors: true
+  when: user_team.github_role == "maintainer"

@@ -1,0 +1,12 @@
+apiVersion: microsoft-teamsuser.nttdata.com/v1
+kind: MicrosoftTeamsUser
+metadata:
+  labels:
+    app.kubernetes.io/name: microsoftteamsuser
+    app.kubernetes.io/instance: microsoftteamsuser-sample
+    app.kubernetes.io/part-of: knot-microsoft-teamsusers-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: knot-microsoft-teamsusers-operator
+  name: microsoftteamsuser-sample
+spec:
+  # TODO(user): Add fields here

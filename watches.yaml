@@ -1,0 +1,11 @@
+---
+# Use the 'create api' subcommand to add watches to this file.
+- version: v1
+  group: microsoft-teamsuser.nttdata.com
+  kind: MicrosoftTeamsUser
+  playbook: playbooks/microsoftteamsuser-create.yml
+  finalizer:
+    name: microsoft-teamsuser.nttdata.com
+    playbook: playbooks/microsoftteamsuser-delete.yml
+  # FIXME: Specify the role or playbook for this resource.
+#+kubebuilder:scaffold:watch

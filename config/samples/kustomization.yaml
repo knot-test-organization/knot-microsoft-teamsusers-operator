@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- microsoft-teamsuser_v1_microsoftteamsuser.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples
